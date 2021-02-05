@@ -43,6 +43,7 @@ void GemmInt8UnitN8Naive(long mr, long nr, long k, const int8_t* a, long a_strid
             for (int kk = 0; kk < k; kk++) {
                 acc += (int32_t)a[m * a_stride + kk] * (int32_t)packed_w[kk * 8 + n];
             }
+
             auto res = acc * scales[n];
             // Conv-Relu-Add
             if (relu < 0) {
@@ -685,8 +686,10 @@ void DepthwiseI8General(int8_t* dst, const int8_t* src, const int8_t* weight, co
 /*
 convdw 3x3 int8 func
 */
-void DepthwiseI8K3S1Kernel(int8_t* dst, const int8_t* src, const int8_t* weight, const int32_t* bias_z, long width,
-                           long src_y_step, long src_w_step, long dst_depth, long fw, long fh, const float* scale_z,
+#ifdef __aarch64__
+
+void DepthwiseI8K3S1Kernel(int8_t* dst, const int8_t* src, const int8_t* weight, const int32_t* bias_z,
+                           long src_y_step, long src_w_step, long dst_depth, const float* scale_z,
                            long dx, long dc) {
     auto dst_x       = dst + dx * dst_depth + dc;
     const auto src_z = src + dx * src_w_step + dc;
@@ -733,8 +736,23 @@ void DepthwiseI8K3S1Kernel(int8_t* dst, const int8_t* src, const int8_t* weight,
     }
 }
 
-void DepthwiseI8K3Kernel(int8_t* dst, const int8_t* src, const int8_t* weight, const int32_t* bias_z, long width,
-                         long src_y_step, long src_w_step, long dst_depth, long fw, long fh, const float* scale_z,
+#else   // __aarch64__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void DepthwiseI8K3S1Kernel(int8_t* dst, const int8_t* src, const int8_t* weight, const int32_t* bias_z,
+                           long src_y_step, long src_w_step, long dst_depth, const float* scale_z,
+                           long dx, long dc);
+#ifdef __cplusplus
+}
+#endif
+
+#endif  // __aarch64__
+
+void DepthwiseI8K3Kernel(int8_t* dst, const int8_t* src, const int8_t* weight, const int32_t* bias_z,
+                         long src_y_step, long src_w_step, long dst_depth, const float* scale_z,
                          long dx, long dc) {
     auto dst_x       = dst + dx * dst_depth + dc;
     const auto src_z = src + dx * src_w_step + dc;
@@ -775,13 +793,13 @@ void DepthwiseI8K3(int8_t* dst, const int8_t* src, const int8_t* weight, const i
         for (dx = 0; dx < width - 3; dx += 4) {
             long dc = 0;
             for (; dc < dst_depth - 7; dc += 8) {
-                DepthwiseI8K3S1Kernel(dst, src, weight, bias_z, width, dilate_y_step, src_w_step, dst_depth, fw, fh,
+                DepthwiseI8K3S1Kernel(dst, src, weight, bias_z, dilate_y_step, src_w_step, dst_depth,
                                       scale_z, dx, dc);
             }
 
             if (dc < dst_depth) {
                 dc = dst_depth - 8;
-                DepthwiseI8K3S1Kernel(dst, src, weight, bias_z, width, dilate_y_step, src_w_step, dst_depth, fw, fh,
+                DepthwiseI8K3S1Kernel(dst, src, weight, bias_z, dilate_y_step, src_w_step, dst_depth,
                                       scale_z, dx, dc);
             }
         }
@@ -791,13 +809,13 @@ void DepthwiseI8K3(int8_t* dst, const int8_t* src, const int8_t* weight, const i
     for (; dx < width; dx++) {
         long dc = 0;
         for (; dc < dst_depth - 7; dc += 8) {
-            DepthwiseI8K3Kernel(dst, src, weight, bias_z, width, dilate_y_step, src_w_step, dst_depth, fw, fh, scale_z,
+            DepthwiseI8K3Kernel(dst, src, weight, bias_z, dilate_y_step, src_w_step, dst_depth, scale_z,
                                 dx, dc);
         }
 
         if (dc < dst_depth) {
             dc = dst_depth - 8;
-            DepthwiseI8K3Kernel(dst, src, weight, bias_z, width, dilate_y_step, src_w_step, dst_depth, fw, fh, scale_z,
+            DepthwiseI8K3Kernel(dst, src, weight, bias_z, dilate_y_step, src_w_step, dst_depth, scale_z,
                                 dx, dc);
         }
     }
