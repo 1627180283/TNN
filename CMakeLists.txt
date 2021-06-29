@@ -40,6 +40,8 @@ option(TNN_ONNX2TNN_ENABLE "Enable ONNX2TNN Converter" OFF)
 option(TNN_TNN2MEM_ENABLE "Enable tnn2mem" OFF)
 option(TNN_BUILD_BENCHMARK_TEST_LIB_ENABLE "Enable Build Benchmark Test Lib" OFF)
 
+option(TNN_DEBUG_INIT_ENABLE "Debug" ON)
+
 message(${CMAKE_SOURCE_DIR})
 message(${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -356,6 +358,10 @@ endif()
 if(TNN_CONVERTER_ENABLE)
     add_subdirectory(third_party/flatbuffers)
     add_subdirectory(tools/converter)
+endif()
+
+if(TNN_DEBUG_INIT_ENABLE)
+    add_subdirectory(debug)
 endif()
 
 if(TNN_ONNX2TNN_ENABLE)
